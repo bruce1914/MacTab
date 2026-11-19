@@ -66,6 +66,27 @@ final class WindowSwitchSessionTests: XCTestCase {
         XCTAssertEqual(session.selected, b)
     }
 
+    func testClosingSelectedWindowChoosesNextSurvivorWithoutReordering() {
+        var session = WindowSwitchSession(windows: [a,b,c], backwards: false)!
+        let token = session.token
+        XCTAssertTrue(session.retain([a,c]))
+        XCTAssertEqual(session.windows, [a,c])
+        XCTAssertEqual(session.selected, c)
+        XCTAssertEqual(session.token, token)
+        session.advance(backwards: false)
+        XCTAssertEqual(session.selected, a)
+    }
+
+    func testClosingOtherWindowKeepsSelectionAndLastWindowWraps() {
+        var session = WindowSwitchSession(windows: [a,b,c], backwards: false)!
+        XCTAssertTrue(session.retain([b,c]))
+        XCTAssertEqual(session.selected, b)
+        session.select(c)
+        XCTAssertTrue(session.retain([b]))
+        XCTAssertEqual(session.selected, b)
+        XCTAssertFalse(session.retain([]))
+    }
+
     func testParallelsGuestShortcutsPassThrough() {
         XCTAssertFalse(WindowSwitcher.handlesShortcuts(for: "com.parallels.vm"))
         XCTAssertFalse(WindowSwitcher.handlesShortcuts(for: "com.parallels.winapp.vm-id.windows-app"))

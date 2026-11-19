@@ -16,3 +16,7 @@ Version 0.1.0 was built and run on macOS 14.8.9 / Apple Silicon. All 22 automate
 The automated suite covers frozen candidate order, repeated previous-window switching, reverse/wrap behavior, single/empty lists, pointer selection, Parallels bypass decisions, preview matching, cache eviction/release, gallery pagination, and click geometry. These tests do not replace macOS permission and real-window integration checks.
 
 For a manual check, open two windows in one app and one window in another. Test quick switching back and forth, mouse focus followed by Command+Tab, reverse selection, Escape, hover and immediate click activation, closing a candidate, pause/quit, and switching inside Parallels. Check real thumbnails after granting Screen Recording. Test RealVNC and cross-Space/full-screen behavior separately if you rely on them.
+
+## Close-button update (0.2.0)
+
+25 local automated tests pass, including selection after closing a window and close-button hit targets across pages. Native test windows disappeared from the gallery in approximately 70–71 ms in a short local check. A window with a confirmation sheet remained open after cancellation. These measurements are not a guarantee for every application. Closing uses the window’s Accessibility close button; MacTab does not quit its application or force-close documents.

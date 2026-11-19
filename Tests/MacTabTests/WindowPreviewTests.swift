@@ -119,6 +119,23 @@ final class WindowPreviewTests: XCTestCase {
         XCTAssertEqual(seven.index(at: CGPoint(x: 246, y: 328), count: 7), 4)
     }
 
+    func testCloseTargetsStayInsideTheirOwnCardAcrossPagesAndPartialRows() {
+        for total in [1, 2, 6, 7, 17, 73] {
+            for selected in 0..<total {
+                let layout = WindowPreviewLayout(count: total, selectedIndex: selected, screen: CGSize(width: 1440, height: 900))
+                let count = layout.range.count
+                for index in 0..<count {
+                    let rect = layout.cardRect(at: index, count: count)!
+                    let close = CGPoint(x: rect.maxX - 18, y: rect.minY + 18)
+                    XCTAssertEqual(layout.closeIndex(at: close, count: count), index)
+                    XCTAssertEqual(layout.index(at: close, count: count), index)
+                    XCTAssertNil(layout.closeIndex(at: CGPoint(x: rect.midX, y: rect.midY), count: count))
+                    XCTAssertNil(layout.closeIndex(at: CGPoint(x: rect.maxX + 1, y: rect.minY + 18), count: count))
+                }
+            }
+        }
+    }
+
     func testEmptyAndSingleWindowLayoutsRemainValid() {
         let empty = WindowPreviewLayout(count: 0, selectedIndex: 0, screen: CGSize(width: 1440, height: 900))
         XCTAssertTrue(empty.range.isEmpty)

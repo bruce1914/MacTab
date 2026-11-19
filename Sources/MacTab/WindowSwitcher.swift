@@ -31,6 +31,8 @@ final class WindowSwitcher: ObservableObject {
     private var activationFailure: String?
     private var allowsShortcut = true
     private var expectedTapDisable = false
+    private var closing: Set<UUID> = []
+    private var closeMessage: String?
 
     nonisolated static func handlesShortcuts(for bundleIdentifier: String?) -> Bool {
         guard let bundleIdentifier else { return true }
@@ -191,6 +193,8 @@ final class WindowSwitcher: ObservableObject {
         if let mouseMonitor { NSEvent.removeMonitor(mouseMonitor) }
         mouseMonitor = nil
         activationFailure = nil
+        closing.removeAll()
+        closeMessage = nil
         tabDown = false
         escapeDown = false
     }
@@ -268,7 +272,11 @@ final class WindowSwitcher: ObservableObject {
     }
 
     private func drawPanel() {
-        guard panelVisible, let session else { return }
+        guard panelVisible, self.session != nil else { return }
+        let available = Set(cached.map(\.id))
+        guard self.session?.retain(available) == true else { cancel(); return }
+        frozen.removeAll { !available.contains($0.id) }
+        guard let session else { return }
         if panel == nil { panel = WindowSwitcherPanel() }
         let rows = frozen.map { old in cached.first { $0.id == old.id } ?? old }
         let token = session.token
@@ -285,10 +293,34 @@ final class WindowSwitcher: ObservableObject {
                 guard let self, self.panelVisible, self.session?.token == token else { return }
                 self.session?.advance(backwards: backwards)
                 self.drawPanel()
-            })
+            }, close: { [weak self] id in
+                guard self?.session?.token == token else { return }
+                self?.closeWindow(id)
+            }, message: closeMessage)
+    }
+
+    private func closeWindow(_ id: UUID) {
+        guard panelVisible, !closing.contains(id), let window = cached.first(where: { $0.id == id }) else { return }
+        closing.insert(id)
+        closeMessage = nil
+        let generation = catalogGeneration
+        catalog?.close(window) { [weak self] result in
+            guard let self, self.catalogGeneration == generation else { return }
+            self.closing.remove(id)
+            switch result {
+            case .requested: break
+            case .unavailable: self.closeMessage = "This window could not be closed."
+            case .needsAttention:
+                self.cancel()
+                NSRunningApplication(processIdentifier: window.pid)?.activate(options: [])
+            }
+            self.refresh()
+            self.drawPanel()
+        }
     }
 
     private func commitSelection() {
+        if let selected = session?.selected, closing.contains(selected) { cancel(); return }
         let target = session?.selected
         pendingTarget = target
         promotePending()
@@ -303,6 +335,7 @@ final class WindowSwitcher: ObservableObject {
         presentation = nil
         panel?.hide()
         panelVisible = false
+        closeMessage = nil
     }
 
     private func promotePending() {
@@ -343,6 +376,7 @@ private final class WindowCatalog {
     private var windows: [SwitchWindow] = []
     private var observers: [pid_t: AXObserver] = [:]
     private var watched: Set<UUID> = []
+    private var removedDuringScan: Set<UUID> = []
     private var order: [UUID: UInt64] = [:]
     private var serial: UInt64 = 0
     private var lastFocus: UUID?
@@ -452,7 +486,10 @@ private final class WindowCatalog {
 
     private func merge(_ discovered: [SwitchWindow], applications: [NSRunningApplication], previousIDs: Set<UUID>) {
         // A focused window may have been learned while discovery was still running. Keep its identity and rank.
-        var found = discovered.map { incoming in
+        // A scan that started before a close must not resurrect its stale result.
+        let liveDiscovered = discovered.filter { !removedDuringScan.contains($0.id) }
+        removedDuringScan.removeAll()
+        var found = liveDiscovered.map { incoming in
             guard let current = windows.first(where: { $0.pid == incoming.pid && CFEqual($0.element, incoming.element) }) else { return incoming }
             return SwitchWindow(id: current.id, pid: incoming.pid, element: incoming.element,
                 application: incoming.application, title: incoming.title, icon: incoming.icon, frame: incoming.frame)
@@ -498,8 +535,9 @@ private final class WindowCatalog {
             let catalog = Unmanaged<WindowCatalog>.fromOpaque(context).takeUnretainedValue()
             catalog.queue.async { [catalog] in
                 guard !catalog.stopped else { return }
-                if notification as String == kAXWindowCreatedNotification
-                    || notification as String == kAXUIElementDestroyedNotification {
+                if notification as String == kAXUIElementDestroyedNotification {
+                    catalog.removeClosedWindow(element)
+                } else if notification as String == kAXWindowCreatedNotification {
                     catalog.refresh()
                 } else if notification as String == kAXTitleChangedNotification {
                     catalog.updateTitle(element)
@@ -512,6 +550,17 @@ private final class WindowCatalog {
         }
         observers[pid] = observer
         CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .commonModes)
+    }
+
+    private func removeClosedWindow(_ element: AXUIElement) {
+        guard let index = windows.firstIndex(where: { CFEqual($0.element, element) }) else { return }
+        let window = windows.remove(at: index)
+        if scanLock.withLock({ scanPending }) { removedDuringScan.insert(window.id) }
+        watched.remove(window.id)
+        order.removeValue(forKey: window.id)
+        if lastFocus == window.id { lastFocus = nil }
+        // Publish the exact-window removal before any full application discovery.
+        publish()
     }
 
     private func updateTitle(_ element: AXUIElement) {
@@ -552,6 +601,51 @@ private final class WindowCatalog {
             return left == right ? $0.offset < $1.offset : left > right
         }.map(\.element)
         DispatchQueue.main.async { [deliver] in deliver(indexed) }
+    }
+
+    enum CloseResult { case requested, unavailable, needsAttention }
+
+    func close(_ window: SwitchWindow, completion: @escaping @MainActor (CloseResult) -> Void) {
+        queue.async { [self] in
+            guard !stopped else { return }
+            // Press only this window's native close button; never send a global shortcut or quit its app.
+            guard windows.contains(where: { $0.id == window.id && CFEqual($0.element, window.element) }),
+                  value(window.element, kAXRoleAttribute) as? String == kAXWindowRole,
+                  let raw = value(window.element, kAXCloseButtonAttribute),
+                  CFGetTypeID(raw) == AXUIElementGetTypeID() else {
+                DispatchQueue.main.async { completion(.unavailable) }; return
+            }
+            let button = unsafeBitCast(raw, to: AXUIElement.self)
+            guard value(button, kAXEnabledAttribute) as? Bool != false else {
+                DispatchQueue.main.async { completion(.unavailable) }; return
+            }
+            let result = onElement(button) { AXUIElementPerformAction(button, kAXPressAction as CFString) }
+            guard result == .success else {
+                DispatchQueue.main.async { completion(.unavailable) }; return
+            }
+            queue.asyncAfter(deadline: .now() + 0.25) { [self] in
+                guard !stopped else { return }
+                // Some apps omit destroy notifications. Confirm against this app only.
+                let application = AXUIElementCreateApplication(window.pid)
+                AXUIElementSetMessagingTimeout(application, 0.12)
+                var rawWindows: CFTypeRef?
+                let lookup = AXUIElementCopyAttributeValue(application, kAXWindowsAttribute as CFString, &rawWindows)
+                if lookup == .success, let live = rawWindows as? [AXUIElement],
+                   !live.contains(where: { CFEqual($0, window.element) }) {
+                    removeClosedWindow(window.element)
+                    DispatchQueue.main.async { completion(.requested) }
+                    return
+                }
+                let children = value(window.element, kAXChildrenAttribute) as? [AXUIElement] ?? []
+                let hasSheet = children.contains { value($0, kAXRoleAttribute) as? String == kAXSheetRole }
+                var modal = false
+                if let focused = value(application, kAXFocusedWindowAttribute), CFGetTypeID(focused) == AXUIElementGetTypeID() {
+                    modal = value(unsafeBitCast(focused, to: AXUIElement.self), kAXModalAttribute) as? Bool == true
+                }
+                let outcome: CloseResult = (hasSheet || modal) ? .needsAttention : .requested
+                DispatchQueue.main.async { completion(outcome) }
+            }
+        }
     }
 
     func activate(_ window: SwitchWindow, completion: @escaping @MainActor (Bool) -> Void) {

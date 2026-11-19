@@ -84,21 +84,31 @@ struct WindowPreviewLayout {
     let range: Range<Int>
     var gridHeight: CGFloat { size.height - 88 }
 
-    func index(at point: CGPoint, count: Int) -> Int? {
-        guard count > 0 else { return nil }
+    static let closeButtonSize: CGFloat = 24
+    static let closeButtonInset: CGFloat = 6
+
+    func cardRect(at index: Int, count: Int) -> CGRect? {
+        guard index >= 0, index < count else { return nil }
         let rows = Int(ceil(Double(count) / Double(columns)))
         let height = CGFloat(rows) * Self.cardHeight + CGFloat(rows - 1) * Self.spacing
-        let top = 46 + (gridHeight - height) / 2
-        guard point.y >= top else { return nil }
-        let row = Int((point.y - top) / (Self.cardHeight + Self.spacing))
-        guard row < rows, point.y - top - CGFloat(row) * (Self.cardHeight + Self.spacing) < Self.cardHeight else { return nil }
+        let row = index / columns
         let items = min(columns, count - row * columns)
         let width = CGFloat(items) * cardWidth + CGFloat(items - 1) * Self.spacing
-        let left = (size.width - width) / 2
-        guard point.x >= left else { return nil }
-        let column = Int((point.x - left) / (cardWidth + Self.spacing))
-        guard column < items, point.x - left - CGFloat(column) * (cardWidth + Self.spacing) < cardWidth else { return nil }
-        return row * columns + column
+        return CGRect(x: (size.width - width) / 2 + CGFloat(index % columns) * (cardWidth + Self.spacing),
+                      y: 46 + (gridHeight - height) / 2 + CGFloat(row) * (Self.cardHeight + Self.spacing),
+                      width: cardWidth, height: Self.cardHeight)
+    }
+
+    func index(at point: CGPoint, count: Int) -> Int? {
+        (0..<max(0, count)).first { cardRect(at: $0, count: count)?.contains(point) == true }
+    }
+
+    func closeIndex(at point: CGPoint, count: Int) -> Int? {
+        guard let index = index(at: point, count: count), let rect = cardRect(at: index, count: count) else { return nil }
+        let button = CGRect(x: rect.maxX - Self.closeButtonInset - Self.closeButtonSize,
+                            y: rect.minY + Self.closeButtonInset,
+                            width: Self.closeButtonSize, height: Self.closeButtonSize)
+        return button.contains(point) ? index : nil
     }
 
     init(count: Int, selectedIndex: Int, screen: CGSize) {

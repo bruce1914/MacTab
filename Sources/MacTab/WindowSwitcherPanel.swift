@@ -24,6 +24,7 @@ final class WindowSwitcherPanel {
     private var pointerLayout: WindowPreviewLayout?
     private var pointerIDs: [UUID] = []
     private var confirm: ((UUID) -> Void)?
+    private var close: ((UUID) -> Void)?
 
     init() {
         panel = WindowSwitchNativePanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
@@ -44,7 +45,8 @@ final class WindowSwitcherPanel {
     func show(_ windows: [SwitchWindow], selected: UUID, available: Set<UUID>,
               session token: UUID? = nil,
               requestPermission: @escaping () -> Void = {}, confirm: @escaping (UUID) -> Void = { _ in },
-              advance: @escaping (Bool) -> Void = { _ in }) {
+              advance: @escaping (Bool) -> Void = { _ in },
+              close: @escaping (UUID) -> Void = { _ in }, message: String? = nil) {
         let screen = (panel.isVisible ? panel.screen : nil)
             ?? NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) }
             ?? NSScreen.main
@@ -53,7 +55,7 @@ final class WindowSwitcherPanel {
         let index = windows.firstIndex { $0.id == selected } ?? 0
         let layout = WindowPreviewLayout(count: windows.count, selectedIndex: index, screen: frame.size)
         let page = Array(windows[layout.range])
-        if !panel.isVisible {
+        if !panel.isVisible || panel.frame.size != layout.size {
             panel.setFrame(CGRect(x: frame.midX - layout.size.width / 2, y: frame.midY - layout.size.height / 2,
                                   width: layout.size.width, height: layout.size.height), display: false)
         }
@@ -61,8 +63,9 @@ final class WindowSwitcherPanel {
         pointerLayout = layout
         pointerIDs = page.map(\.id)
         self.confirm = confirm
+        self.close = close
         let root = WindowSwitcherGallery(windows: page, selected: selected, available: available,
-            layout: layout, total: windows.count, previews: previews, requestPermission: requestPermission)
+            layout: layout, total: windows.count, previews: previews, requestPermission: requestPermission, close: close, message: message)
         if let hosting { hosting.rootView = root }
         else {
             let hosting = NSHostingView(rootView: root)
@@ -77,7 +80,9 @@ final class WindowSwitcherPanel {
                     let point = event.locationInWindow
                     let local = CGPoint(x: point.x, y: self.panel.frame.height - point.y)
                     guard let index = self.pointerLayout?.index(at: local, count: self.pointerIDs.count) else { return event }
-                    self.confirm?(self.pointerIDs[index])
+                    if self.pointerLayout?.closeIndex(at: local, count: self.pointerIDs.count) == index {
+                        self.close?(self.pointerIDs[index])
+                    } else { self.confirm?(self.pointerIDs[index]) }
                     return nil
                 }
                 guard event.momentumPhase.isEmpty else { return nil }
@@ -108,6 +113,7 @@ final class WindowSwitcherPanel {
         pointerLayout = nil
         pointerIDs.removeAll()
         confirm = nil
+        close = nil
         previews.end()
         session = UUID()
     }
@@ -126,6 +132,8 @@ private struct WindowSwitcherGallery: View {
     let total: Int
     @ObservedObject var previews: WindowPreviews
     let requestPermission: () -> Void
+    let close: (UUID) -> Void
+    let message: String?
 
     var body: some View {
         VStack(spacing: 12) {
@@ -141,7 +149,8 @@ private struct WindowSwitcherGallery: View {
                     HStack(spacing: WindowPreviewLayout.spacing) {
                         ForEach(Array(windows.dropFirst(row * layout.columns).prefix(layout.columns))) { window in
                             WindowPreviewCard(window: window, image: previews.image(for: window.id),
-                                selected: window.id == selected, available: available.contains(window.id))
+                                selected: window.id == selected, available: available.contains(window.id),
+                                close: { close(window.id) })
                                 .frame(width: layout.cardWidth, height: WindowPreviewLayout.cardHeight)
                         }
                     }
@@ -151,6 +160,7 @@ private struct WindowSwitcherGallery: View {
             HStack {
                 Text("\(layout.range.lowerBound + 1)–\(layout.range.upperBound) / \(total)")
                     .font(.system(size: 11).monospacedDigit())
+                if let message { Text(message).lineLimit(1).help(message) }
                 Spacer()
                 if previews.needsPermission {
                     Button("Enable previews", action: requestPermission)
@@ -173,6 +183,7 @@ private struct WindowPreviewCard: View {
     let image: CGImage?
     let selected: Bool
     let available: Bool
+    let close: () -> Void
     @State private var hovered = false
 
     var body: some View {
@@ -182,6 +193,7 @@ private struct WindowPreviewCard: View {
                 if let icon = window.icon { Image(nsImage: icon).resizable().frame(width: 18, height: 18) }
                 Text(window.application).font(.system(size: 12, weight: .medium)).lineLimit(1)
                 Spacer(minLength: 0)
+                Color.clear.frame(width: WindowPreviewLayout.closeButtonSize, height: 18)
             }
             ZStack {
                 RoundedRectangle(cornerRadius: 5).fill(MacTabTheme.surface)
@@ -202,6 +214,19 @@ private struct WindowPreviewCard: View {
         .overlay(RoundedRectangle(cornerRadius: 9).stroke(
             selected ? MacTabTheme.accent : (hoverOutline ? MacTabTheme.secondary.opacity(0.75) : MacTabTheme.rule),
             lineWidth: selected ? 2 : (hoverOutline ? 1.5 : 1)))
+        .overlay(alignment: .topTrailing) {
+            if hovered && available {
+                Button(action: close) {
+                    Image(systemName: "xmark").font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(MacTabTheme.text)
+                        .frame(width: WindowPreviewLayout.closeButtonSize, height: WindowPreviewLayout.closeButtonSize)
+                        .background(MacTabTheme.surface, in: RoundedRectangle(cornerRadius: 5))
+                }
+                .buttonStyle(.plain).help("Close window")
+                .accessibilityLabel("Close " + window.title)
+                .padding(WindowPreviewLayout.closeButtonInset)
+            }
+        }
         .opacity(available ? 1 : 0.5)
         .onHover { hovered = $0 }
     }

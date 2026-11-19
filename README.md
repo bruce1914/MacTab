@@ -10,17 +10,22 @@ Have three browser windows open? macOS Command+Tab gives you one app icon. You s
 
 *Illustrated walkthrough with sample windows, rendered using MacTab’s card UI. [Static preview](docs/images/mactab-preview.png).*
 
-**[Download MacTab for Mac](https://github.com/bruce1914/MacTab/releases/download/v0.1.0/MacTab-0.1.0-universal-unnotarized.zip)** · [All releases](https://github.com/bruce1914/MacTab/releases) · [Build from source](docs/BUILDING.md)
+**[Download MacTab 0.2.0 for Mac](https://github.com/bruce1914/MacTab/releases/download/v0.2.0/MacTab-0.2.0-universal-unnotarized.zip)** · [All releases](https://github.com/bruce1914/MacTab/releases) · [Build from source](docs/BUILDING.md)
 
 macOS 14+ · Apple Silicon & Intel · Free and open source · MIT
 
 > **Preview release:** the download is not notarized, so macOS may block it. Building from source is recommended until a notarized release is available. [Build and signing details](docs/BUILDING.md).
+
+## New in 0.2.0
+
+Hover over a card to reveal **×** in its top-right corner. Close a window directly from the switcher, then keep browsing. Closed cards disappear promptly without waiting for a full window scan; the app’s own save prompt still protects unsaved work.
 
 ## Less searching. Faster switching.
 
 - **Several windows in one app?** See each one separately, with its title and a thumbnail.
 - **Moving between two tasks?** A quick Command+Tab returns to the last window. Press it again to go back.
 - **Know it when you see it?** Point at a card and click to switch immediately. Hovering never changes your keyboard selection.
+- **Done with a window?** Hover over its card and click the top-right **×** to close it. The app still handles any unsaved-work prompt.
 - **Working inside Parallels Windows?** MacTab steps aside so Parallels keeps control of guest shortcuts.
 
 ## Start in three steps
@@ -40,6 +45,7 @@ MacTab starts paused on first launch. Without Screen Recording, cards show app i
 | Hold **Command**, press **Shift+Tab** | Select the previous window |
 | Release **Command** | Switch to the selected window |
 | **Escape** | Cancel and stay where you were |
+| Hover, then click **×** | Close that window; keep browsing the remaining cards |
 | Hover, then **left-click** a card | Switch to that window immediately |
 
 ## Small by design
@@ -48,7 +54,7 @@ Native Swift and AppKit. No ads, subscriptions, analytics, network requests, or 
 
 ## Before you rely on it
 
-The standalone app has been checked on macOS 14.8.9 / Apple Silicon, including thumbnails, card clicks, and Parallels guest shortcuts. **22 automated tests pass.** Intel binaries compile, but have not been tested on Intel hardware.
+The standalone app has been checked on macOS 14.8.9 / Apple Silicon, including thumbnails, card clicks, and Parallels guest shortcuts. **25 automated tests pass.** Intel binaries compile, but have not been tested on Intel hardware.
 
 Minimized or offscreen windows may show icons instead of previews. Some apps do not expose usable windows; switching across Spaces and full-screen apps is not guaranteed. [Compatibility and validation](docs/COMPATIBILITY.md).
 
