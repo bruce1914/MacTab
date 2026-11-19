@@ -8,8 +8,6 @@ Have three browser windows open? macOS Command+Tab gives you one app icon. You s
 
 ![MacTab window switcher showing seven preview cards, including two separate ChatGPT windows, with DeepSeek Harness selected.](docs/images/mactab-preview.png)
 
-*Based on a real MacTab screenshot, cropped and AI-edited for an English preview. Text inside thumbnails has been redrawn. [View full-size](docs/images/mactab-preview.png).*
-
 **[Download MacTab 0.2.0 for Mac](https://github.com/bruce1914/MacTab/releases/download/v0.2.0/MacTab-0.2.0-universal-unnotarized.zip)** · [All releases](https://github.com/bruce1914/MacTab/releases) · [Build from source](docs/BUILDING.md)
 
 macOS 14+ · Apple Silicon & Intel · Free and open source · MIT
