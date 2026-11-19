@@ -1,96 +1,57 @@
 # MacTab
 
-**Windows-style Alt+Tab for your Mac — using Command+Tab.**
+## Go straight to the window you need.
 
-Switch between individual windows, including multiple windows from the same app, with a compact thumbnail gallery. Built with Swift and AppKit. No subscriptions, ads, telemetry, or third-party dependencies.
+**Windows-style Alt+Tab for your Mac, using Command+Tab.**
 
-## Features
+Have three browser windows open? macOS Command+Tab gives you one app icon. You still have to find the right window. **MacTab puts each window in its own preview card**, so you can choose the document, project, or connection you actually need.
 
-- Window-level recent-use order, including focus changes made with the mouse.
-- Quick Command+Tab switches to the previous window; repeat to switch back.
-- Hold Command and press Tab to advance, or Shift+Tab to go backward.
-- Release Command to activate the selected window. Escape cancels.
-- Hover gives a separate outline without changing the keyboard selection. Left-click a card to switch immediately.
-- App icons, app names, window titles, and optional thumbnail previews.
-- Menu-bar controls for enable/pause, permissions, and quit.
-- Parallels applications retain their own keyboard shortcuts.
-- English interface. No automatic login startup.
+![MacTab walkthrough: two Safari windows appear separately, Tab selects Notes, the mouse highlights another card, and clicking opens that window.](docs/images/mactab-demo.gif)
 
-## Downloads
+*Illustrated walkthrough with sample windows, rendered using MacTab’s card UI. [Static preview](docs/images/mactab-preview.png).*
 
-See [Releases](https://github.com/bruce1914/MacTab/releases) for source and experimental universal app builds. Version 0.1.0 is an **unnotarized preview**, not a Developer ID distribution release. macOS may block a downloaded build; building from source is the recommended option until a notarized release is available.
+**[Download MacTab for Mac](https://github.com/bruce1914/MacTab/releases/download/v0.1.0/MacTab-0.1.0-universal-unnotarized.zip)** · [All releases](https://github.com/bruce1914/MacTab/releases) · [Build from source](docs/BUILDING.md)
 
-## Requirements
+macOS 14+ · Apple Silicon & Intel · Free and open source · MIT
 
-macOS 14 or later. Building requires Xcode with the macOS SDK and Swift 5.9 or later. The code has no package dependencies. Native builds use your Mac's architecture; universal builds include Apple Silicon and Intel.
+> **Preview release:** the download is not notarized, so macOS may block it. Building from source is recommended until a notarized release is available. [Build and signing details](docs/BUILDING.md).
 
-## Build and install
+## Less searching. Faster switching.
 
-```sh
-git clone https://github.com/bruce1914/MacTab.git
-cd MacTab
-swift test
-./build.sh
-mkdir -p "$HOME/Applications"
-ditto dist/MacTab.app "$HOME/Applications/MacTab.app"
-open "$HOME/Applications/MacTab.app"
-```
+- **Several windows in one app?** See each one separately, with its title and a thumbnail.
+- **Moving between two tasks?** A quick Command+Tab returns to the last window. Press it again to go back.
+- **Know it when you see it?** Point at a card and click to switch immediately. Hovering never changes your keyboard selection.
+- **Working inside Parallels Windows?** MacTab steps aside so Parallels keeps control of guest shortcuts.
 
-The default build uses an ad-hoc signature. For repeat local builds, use a stable signing identity from your own Keychain so macOS can retain its permission decisions:
+## Start in three steps
 
-```sh
-SIGNING_IDENTITY="Apple Development: YOUR NAME (TEAM)" ./build.sh
-```
+1. Move **MacTab.app** to your Applications folder and open it.
+2. From the menu-bar settings, allow **Accessibility**. Optionally allow **Screen Recording** to see window previews.
+3. Click **Enable**, then hold **Command** and press **Tab**.
 
-To build both architectures:
+MacTab starts paused on first launch. Without Screen Recording, cards show app icons and switching still works. Pause or quit from the menu bar to restore the system switcher. Do not enable another Command+Tab replacement at the same time.
 
-```sh
-ARCHITECTURE=universal ./build.sh
-```
+## Keyboard or mouse. Your choice.
 
-Builds are written to `dist/MacTab.app`. Do not run two tools that both intercept Command+Tab at the same time.
+| Action | Result |
+| --- | --- |
+| Quick **Command+Tab** | Return to the previous window |
+| Hold **Command**, press **Tab** | Select the next window |
+| Hold **Command**, press **Shift+Tab** | Select the previous window |
+| Release **Command** | Switch to the selected window |
+| **Escape** | Cancel and stay where you were |
+| Hover, then **left-click** a card | Switch to that window immediately |
 
-## First run
+## Small by design
 
-MacTab starts paused on its first launch. Open its menu-bar settings and:
+Native Swift and AppKit. No ads, subscriptions, analytics, network requests, or automatic login startup. Window previews are created on demand and cleared when the gallery closes. The raw-image cache is capped at **8 MiB**; total process memory is higher. [Privacy and memory details](docs/PRIVACY.md).
 
-1. Click **Accessibility…** and allow **MacTab** in System Settings → Privacy & Security → Accessibility.
-2. Optionally click **Window previews…** and allow **MacTab** under Screen Recording. Follow any macOS prompt to quit and reopen the app.
-3. Click **Enable**.
+## Before you rely on it
 
-If MacTab is absent from the permissions list, use the system's **+** button to add the installed app. Permissions belong to MacTab itself; permissions granted to another app do not carry over. Without Screen Recording, cards show app icons and switching remains available. Pausing or quitting removes the shortcut listener so macOS can handle Command+Tab normally.
+The standalone app has been checked on macOS 14.8.9 / Apple Silicon, including thumbnails, card clicks, and Parallels guest shortcuts. **22 automated tests pass.** Intel binaries compile, but have not been tested on Intel hardware.
 
-## Privacy and memory
+Minimized or offscreen windows may show icons instead of previews. Some apps do not expose usable windows; switching across Spaces and full-screen apps is not guaranteed. [Compatibility and validation](docs/COMPATIBILITY.md).
 
-MacTab reads window metadata through Accessibility and keeps its recent-use list in memory. It does not record ordinary typed input, save window-title logs, send network requests, or collect work-time history. Settings are stored in the app's own preferences domain.
+Found a window that will not switch? [Report an issue](https://github.com/bruce1914/MacTab/issues) with your macOS version, app name, and steps to reproduce.
 
-Previews are requested only while the gallery is open. Captures are serialized, sized at most 448 × 280 pixels, and cached up to 16 images / 8 MiB of raw image data. Dismissing the gallery clears that cache; any already-running system capture is discarded when it completes. This is a cache limit, not a limit on the entire app's RAM usage. Previews are never written to disk by MacTab.
-
-## Compatibility and limitations
-
-- Apps must expose usable Accessibility windows. Some custom, protected, or system windows cannot be listed or focused.
-- Windows are ordered by focus events observed while MacTab is enabled. Older focus history cannot be recovered on first enable.
-- Minimized/offscreen windows and windows in other Spaces may have icon-only cards. Focusing across Spaces and full-screen spaces depends on macOS and the target app; it is not guaranteed.
-- Ambiguous preview matches use an icon rather than showing another window's content. Protected content may appear blank.
-- RealVNC windows are separate candidates if RealVNC exposes them through Accessibility. Each viewer version and connection mode still needs testing.
-- When a Parallels process is frontmost, MacTab disables its shortcut tap. Guest key mappings remain controlled by Parallels. MacTab does not change them.
-- Secure Input, revoked permissions, or event-tap failures suspend interception. The menu shows the state; pause and re-enable after correcting the permission problem.
-- Only one running MacTab instance is allowed. The app has no updater and does not add itself to login items.
-
-## Release signing
-
-Local development builds are not notarized distribution builds. A release intended for ordinary downloads should be signed with the maintainer's **Developer ID Application** certificate, notarized, and stapled before packaging. Apple Development and ad-hoc signatures do not provide that distribution approval. No certificates, credentials, or private history are included in this repository.
-
-See [Apple's notarization documentation](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution). This project does not ask users to disable Gatekeeper.
-
-## Validation
-
-Version 0.1.0 was built and run on macOS 14.8.9 / Apple Silicon. All 22 automated tests passed. The local user confirmed real window thumbnails, immediate left-click activation, and Command+Tab continuing to work inside Parallels Windows. The universal binary compiled for arm64 and x86_64; Intel hardware, other Macs, RealVNC, and cross-Space/full-screen integration have not been verified for this standalone release.
-
-The automated suite covers frozen candidate order, repeated previous-window switching, reverse/wrap behavior, single/empty lists, pointer selection, Parallels bypass decisions, preview matching, cache eviction/release, gallery pagination, and click geometry. These tests do not replace macOS permission and real-window integration checks.
-
-For a manual check, open two windows in one app and one window in another. Test quick switching back and forth, mouse focus followed by Command+Tab, reverse selection, Escape, hover and immediate click activation, closing a candidate, pause/quit, and switching inside Parallels. Check real thumbnails after granting Screen Recording. Test RealVNC and cross-Space/full-screen behavior separately if you rely on them.
-
-## License
-
-[MIT](LICENSE). Copyright © 2026 bruce1914.
+[MIT License](LICENSE) · Copyright © 2026 bruce1914
